@@ -66,11 +66,6 @@ void sync_fs(const char *);
 void mount_fs(const char *);
 
 /**
- * @brief initialize new filesystem
- */
-void create_fs();
-
-/**
  * @brief finds an empty inode
  * return -1 if could not find
  */
@@ -81,6 +76,34 @@ int find_empty_inode();
  * return -1 if could not find
  */
 int find_empty_block();
+
+/**
+ * @brief seting the needed file size
+ */
+void set_file_size(int,int);
+
+/**
+ * @brief cut the file
+ */
+void shorten_file(int);
+
+/**
+ * @brief write single byte to needed file
+ */
+void write_byte(int, int, char);
+
+/**
+ * @brief read signel byte from needed file
+ * @return char : the readed char || -1 on failure
+ */
+char read_byte(int, int);
+
+/**
+ * @brief Get the block number
+ * 
+ * @return int : the needed block index
+ */
+int get_block_number(int, int);
 
 /**
  * @brief finds empty inode

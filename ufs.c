@@ -1,4 +1,4 @@
-#include "ufs.hpp"
+#include "ufs.h"
 
 /**
  * Global variables
@@ -112,18 +112,19 @@ int find_empty_block(){
 int allocate_file(int n, const char *target){
     if(strlen(target) >= ID){
         printf("given target file name is longer then 8\n");
-        return NULL;
+        exit(EXIT_FAILURE);
     }
     int Inode = find_empty_inode();
     int Block = find_empty_block();
     if((Inode == -1) || (Block == -1)){
         printf("there is no empty inodes or empty blocks\n");
-        return NULL;
+        exit(EXIT_FAILURE);
     }
 
     inode_arr[Inode].first_block = Block;
     inode_arr[Inode].size = n;
     strcpy(inode_arr[Inode].id, target);
+    block_arr[Block].next_block = -2;
     return Inode;
 }
 
@@ -143,13 +144,75 @@ void make_dir(){
     }
 }
 
-// need to complete
+void set_file_size(int num, int size){
+    int block_amount = size / BLOCK;
+    int block_index = inode_arr[num].first_block;
+    if(size % BLOCK != 0)
+        block_amount = block_amount + 1;
+    
+    while(block_amount > 0){
+        int next = block_arr[block_index].next_block;
+        if(next == -2){
+            int curr_block = find_empty_block();
+            block_arr[block_index].next_block = curr_block;
+            block_arr[curr_block].next_block = -2;
+        }
+        block_index = block_arr[block_index].next_block;
+        block_amount--;
+    }
+    shorten_file(block_index);
+    block_arr[block_index].next_block = -2;
+}
+
+void write_byte(int num, int target, char data){
+    int curr = target / BLOCK;
+    int block_index = get_block_number(num, curr);
+    int res = target % BLOCK;
+    block_arr[block_index].data[res] = data;
+}
+
+int get_block_number(int num, int res){
+    int offset = res;
+    int block_index = inode_arr[num].first_block;
+    while(offset > 0){
+        block_index = block_arr[block_index].next_block;
+        offset--;
+    }
+    return block_index;
+}
+
+void shorten_file(int num){
+    int next = block_arr[num].next_block;
+    if(next >= 0)
+        shorten_file(next);
+    block_arr[num].next_block = -1;
+}
+
 ssize_t mywrite(int myfd, const void *buf, size_t count){
     char *res = (char *)buf;
     if(inode_arr[myfd].exist == 'Y' || opened[myfd].fd != myfd){
         printf("error occures\n");
-        return NULL;
+        exit(EXIT_FAILURE);
     }
+    char *curr = (char*)buf;
+    for(size_t i = 0 ; i < count ; i++){
+        write_byte(myfd, opened[myfd].index, curr[i]);
+        opened[myfd].index++;
+    }
+    return opened[myfd].index;
+}
+
+char read_byte(int fd, int target){
+    int next = inode_arr[fd].first_block;
+    while(target >= BLOCK){
+        target = target - BLOCK;
+        next = block_arr[next].next_block;
+        if(next == -1 || next == -2){
+            printf("error in reading\n");
+            return -1;
+        }
+    }
+    return block_arr[next].data[target];
 }
 
 struct mydirent *myreaddir(int target){
@@ -164,14 +227,28 @@ struct mydirent *myreaddir(int target){
 int mylseek(int myfd, int offset, int whence){
     if((offset == 0) || (opened[myfd].fd != myfd)){
         printf("wrong usage of mysleek func, enter positive or negative offset\n");
-        return NULL;
+        exit(EXIT_FAILURE);
     }
     // offset != 0
     opened[myfd].index = opened[myfd].index + offset;
     return opened[myfd].index;
 }
 
+int myclose(int fd){
+    opened[fd].index = -1;
+    opened[fd].fd = -1;
+}
+
+// need to do
+int myopendir(const char *target){
+
+}
+
 int main(){
-    mymkfs(10);
-    printf("done\n");
+    char *data = "i think barak is gay..";
+
+    mymkfs(1000);
+    sync_fs("text.txt");
+
+    return 0;
 }
