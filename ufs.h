@@ -173,4 +173,4 @@ struct mydirent *myreaddir(int);
 /**
  * @brief creating new directory at first Inode
  */
-void make_dir();
+void create_dir();

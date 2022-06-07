@@ -1,4 +1,5 @@
 #include "Mylibc.h"
+#include "color.h"
 
 int myfclose(struct myFile *stream){
     if(!strcmp(stream->func, "r")){
@@ -16,10 +17,11 @@ int myfclose(struct myFile *stream){
     return 1;
 }
 
-struct myFile *myfopen(const char *pathname, const char *mode){
-    int fd = myopen(pathname, 0);
-    struct myFile *target = malloc(sizeof(struct myFile));
-    target->fd = fd;
-    strcpy(target->func, mode);
-    
+int myfseek(struct myFile *stream, long offset, int whence){
+    if(offset == 0){
+        printf("you are trying to move the ptr by 0 bytes\n");
+        exit(EXIT_FAILURE);
+    }
+    stream->p = stream->p + offset;
+    return stream->p;
 }

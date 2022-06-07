@@ -1,4 +1,5 @@
 #include "ufs.h"
+#include "color.h"
 
 /**
  * Global variables
@@ -19,6 +20,7 @@ void mymkfs(int s){
     for(int i = 0 ; i < super.inodes_amount ; i++){
         inode_arr[i].size = -1; // if not allocated
         inode_arr[i].first_block = -1;
+        inode_arr[i].exist = 'N';
         strcpy(inode_arr[i].id, "empty"); // initialize id to nothing
     }
 
@@ -27,6 +29,10 @@ void mymkfs(int s){
         block_arr[i].next_block = -1;
         strcpy(block_arr[i].data, "empty"); // initialize data to nothing
     }
+    GREEN;
+    printf("succsess in creating new directory\n");
+    RESET;
+    create_dir();
 }
 
 void sync_fs(const char *ch){
@@ -77,20 +83,23 @@ int mymount(const char *source, const char *target, const char *filesystemtype, 
 }
 
 void print_fs(){
+    RED;
     printf("Superblock info\n");
     printf("\tnum inodes %d\n", super.inodes_amount);
     printf("\tnum blocks %d\n", super.blocks_amount);
     printf("\tblock size %d\n", super.blokcs_size);
 
+    BLUE;
     printf("Inodes\n");
     for(int i = 0 ; i < super.inodes_amount ; i++){
         printf("\tsize: %d block: %d name: %s\n", inode_arr[i].size, inode_arr[i].first_block , inode_arr[i].id);
     }
-
+    YELLOW;
     printf("Blokcs\n");
     for(int i = 0 ; i < super.blocks_amount ; i++){
         printf("\tblock number: %d next block: %d\n", i, block_arr[i].next_block);
     }
+    RESET;
 }
 
 int find_empty_inode(){
@@ -128,20 +137,21 @@ int allocate_file(int n, const char *target){
     return Inode;
 }
 
-void make_dir(){
+void create_dir(){
     directory *new_dir = (directory *)malloc(sizeof(directory));
     int check = allocate_file(sizeof(directory), "new_dir");
-    if(check == 0){
-        inode_arr[check].exist = 'Y';
-        new_dir->amount = 0;
-        // **** maybe need to update the name ****
-        free(new_dir);
+    if(check != 0){
+        printf("error in creating new directory\n");
+        exit(EXIT_FAILURE);
     }
-
-    else{
-        printf("can't create new directory\n");
-        return;
+    inode_arr[check].exist = 'Y';
+    new_dir->amount = 0;
+    strcpy(new_dir->name, "new_dir");
+    char *to_write = (char *)new_dir;
+    for(int i = 0 ; i < sizeof(directory) ; i++){
+        write_byte(check, i, to_write[i]);
     }
+    free(new_dir);
 }
 
 void set_file_size(int num, int size){
@@ -234,12 +244,13 @@ int mylseek(int myfd, int offset, int whence){
     return opened[myfd].index;
 }
 
+
 int myclose(int fd){
     opened[fd].index = -1;
     opened[fd].fd = -1;
 }
 
-// need to do
+// -------------NEED TO DO-------------
 int myopendir(const char *target){
 
 }

@@ -23,13 +23,19 @@ struct myFile *myfopen(const char *, const char *);
  */
 int myfclose(struct myFile *);
 
-
+/**
+ * @brief this func reads certain amount of data
+ *  and return new pointer to myFile
+ */
 size_t myfread(void *, size_t, size_t, struct myFile *);
 
 
 size_t myfwrite(const void *, size_t, size_t, struct myFile *);
 
-
+/**
+ * @brief moving the pointer by given offset
+ * @return int : the new pointer location
+ */
 int myfseek(struct myFile *, long, int);
 
 
