@@ -29,15 +29,24 @@ void mymkfs(int s){
         block_arr[i].next_block = -1;
         strcpy(block_arr[i].data, "empty"); // initialize data to nothing
     }
+
+    for(int i = 0 ; i < MAX_FILES ; i++){
+        opened[i].fd = -1;
+        opened[i].index = -1;
+        opened[i].inode = -1;
+    }
     GREEN;
     printf("succsess in creating new directory\n");
     RESET;
-    create_dir();
 }
 
 void sync_fs(const char *ch){
     FILE *file;
     file = fopen(ch, "w+");
+    if(file == NULL){
+        printf("error in opening file for writing\n");
+        exit(EXIT_FAILURE);
+    }
 
     // superblock
     fwrite(&super, sizeof(s_block), 1, file);
@@ -57,7 +66,11 @@ void sync_fs(const char *ch){
 
 void mount_fs(const char *ch){
     FILE *file;
-    file = fopen(ch, "r"); 
+    file = fopen(ch, "r");
+    if(file == NULL){
+        printf("error in opening file\n");
+        exit(EXIT_FAILURE);
+    }
 
     // superblock
     fread(&super, sizeof(struct superblock), 1, file);
@@ -118,7 +131,15 @@ int find_empty_block(){
     return -1;  // on failure
 }
 
-int allocate_file(int n, const char *target){
+int find_empty_fd(){
+    for(int i = 0 ; i < MAX_FILES ; i++){
+        if(opened[i].inode == -1)
+            return i;
+    }
+    return -1;
+}
+
+int allocate_file(const char *target){
     if(strlen(target) >= ID){
         printf("given target file name is longer then 8\n");
         exit(EXIT_FAILURE);
@@ -131,7 +152,6 @@ int allocate_file(int n, const char *target){
     }
 
     inode_arr[Inode].first_block = Block;
-    inode_arr[Inode].size = n;
     strcpy(inode_arr[Inode].id, target);
     block_arr[Block].next_block = -2;
     return Inode;
@@ -244,6 +264,28 @@ int mylseek(int myfd, int offset, int whence){
     return opened[myfd].index;
 }
 
+int myopen(const char *pathname, int flags){
+    if(strlen(pathname) <= 0){
+        printf("please give good path name\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(flags == O_CREAT){
+        int empty_fd = find_empty_fd();
+        if(empty_fd == -1){
+            printf("couldn't find empty fd\n");
+            return -1;
+        }
+        int inode = allocate_file(pathname);
+        opened[empty_fd].index = 0;
+        opened[empty_fd].inode = inode;
+        return empty_fd;
+    }
+
+    if(flags == O_RDWR || flags == O_WRONLY || flags == O_RDONLY){
+        
+    }
+}
 
 int myclose(int fd){
     opened[fd].index = -1;

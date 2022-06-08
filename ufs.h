@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 #define BLOCK 512
 #define ID 8
@@ -50,6 +51,7 @@ typedef struct mydirent{
 }directory;
 
 struct myopenfile{
+    int inode;
     int index;
     int fd;
 };
@@ -76,6 +78,13 @@ int find_empty_inode();
  * return -1 if could not find
  */
 int find_empty_block();
+
+/**
+ * @brief check if there is any empty fd in the opened files
+ * @return int: the current index of the empty fd
+ * -1 on failure (couldn't find any empty fd)
+ */
+int find_empty_fd();
 
 /**
  * @brief seting the needed file size
@@ -111,7 +120,7 @@ int get_block_number(int, int);
  * find / claim a block
  * return the fd
  */
-int allocate_file(int, const char *);
+int allocate_file(const char *);
 
 /**
  * @brief print out info about the filesystem from memory
@@ -119,7 +128,7 @@ int allocate_file(int, const char *);
 void print_fs();
 
 /**
- * @brief create new file with given size
+ * @brief create new ufs with given size
  */
 void mymkfs(int);
 
@@ -135,6 +144,11 @@ int mymount(const char *, const char *, const char *, unsigned long, const void 
 /**
  * @brief 
  * opening file from given path
+ * possible values of flags :
+ * - O_RDWR: read and write
+ * - O_WRONLY: write
+ * - O_RDONLY: read
+ * - O_CREAT: create new file in the given path
  */
 int myopen(const char *, int);
 
