@@ -41,7 +41,7 @@ typedef struct inode{
     int size;
     int first_block;
     char id[ID];
-    char exist;
+    char exist; // maybe change to int (1|0)
 }i_node;
 
 typedef struct mydirent{

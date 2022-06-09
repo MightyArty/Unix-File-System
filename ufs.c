@@ -8,6 +8,7 @@ s_block super;
 block *block_arr;
 struct inode *inode_arr;
 struct myopenfile opened[MAX_FILES];
+int SIZE;   // holds the size of file descriptor
 
 void mymkfs(int s){
     int update_size = s - (sizeof(s_block));
@@ -35,6 +36,7 @@ void mymkfs(int s){
         opened[i].index = -1;
         opened[i].inode = -1;
     }
+    SIZE = 0;
     GREEN;
     printf("succsess in creating new directory\n");
     RESET;
@@ -157,23 +159,6 @@ int allocate_file(const char *target){
     return Inode;
 }
 
-void create_dir(){
-    directory *new_dir = (directory *)malloc(sizeof(directory));
-    int check = allocate_file(sizeof(directory), "new_dir");
-    if(check != 0){
-        printf("error in creating new directory\n");
-        exit(EXIT_FAILURE);
-    }
-    inode_arr[check].exist = 'Y';
-    new_dir->amount = 0;
-    strcpy(new_dir->name, "new_dir");
-    char *to_write = (char *)new_dir;
-    for(int i = 0 ; i < sizeof(directory) ; i++){
-        write_byte(check, i, to_write[i]);
-    }
-    free(new_dir);
-}
-
 void set_file_size(int num, int size){
     int block_amount = size / BLOCK;
     int block_index = inode_arr[num].first_block;
@@ -259,8 +244,22 @@ int mylseek(int myfd, int offset, int whence){
         printf("wrong usage of mysleek func, enter positive or negative offset\n");
         exit(EXIT_FAILURE);
     }
-    // offset != 0
-    opened[myfd].index = opened[myfd].index + offset;
+    if(whence < 0 || whence > 2){
+        printf("whence should be 0 | 1 | 2\n");
+        exit(EXIT_FAILURE);
+    }
+    switch(whence){
+        case(SEEK_SET):
+            opened[myfd].index = offset;
+        case(SEEK_END):
+            opened[myfd].index = inode_arr[myfd].size + offset;
+        case(SEEK_CUR):
+            opened[myfd].index = opened[myfd].index + offset;
+    }
+
+    if(opened[myfd].index < 0)
+        opened[myfd].index = 0;
+
     return opened[myfd].index;
 }
 
@@ -279,29 +278,68 @@ int myopen(const char *pathname, int flags){
         int inode = allocate_file(pathname);
         opened[empty_fd].index = 0;
         opened[empty_fd].inode = inode;
+        SIZE++;
         return empty_fd;
     }
 
-    if(flags == O_RDWR || flags == O_WRONLY || flags == O_RDONLY){
-        
+    else if(flags == O_RDWR || flags == O_WRONLY || flags == O_RDONLY){
+        int inode_index = -1;
+        for(int i = 0 ; i < super.inodes_amount ; i++){
+            if(!strcmp(inode_arr[i].id, pathname))
+                inode_index = i;
+        }
+        if(inode_index == -1){
+            printf("error in finding the needed file\n");
+            return -1;
+        }
+        else{
+            int curr = -1;
+            for(int i = 0 ; i < SIZE ; i++){
+                if(opened[i].inode == inode_index)
+                    curr = i;
+            }
+            if(curr == -1){
+                printf("error in finding the needed inode\n");
+                return -1;
+            }
+            else{
+                if(flags == O_WRONLY)
+                    opened[curr].fd = 0;
+                if(flags == O_RDONLY)
+                    opened[curr].fd = 1;
+                if(flags == O_RDWR)
+                    opened[curr].fd = 2;
+                return curr;
+            }
+        }
+    }
+    else{
+        printf("some error occured in opening file\n");
+        return -1;
     }
 }
 
 int myclose(int fd){
     opened[fd].index = -1;
     opened[fd].fd = -1;
+    opened[fd].inode = -1;
+    SIZE--;
+    return 0;
 }
 
 // -------------NEED TO DO-------------
-int myopendir(const char *target){
+// int myopendir(const char *target){
 
-}
+// }
 
 int main(){
     char *data = "i think barak is gay..";
-
     mymkfs(1000);
-    sync_fs("text.txt");
+    mymount("test.txt", "", "", 0, "");
 
-    return 0;
+    myopen("test1", O_CREAT);
+    myopen("test2", O_CREAT);
+
+    print_fs();
+
 }

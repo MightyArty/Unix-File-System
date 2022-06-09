@@ -1,4 +1,5 @@
 # Unix File System
+# By Artem Shabalin and Barak Sharabi
 ## Why do we need file system?
 * Disks are huge block devices
 * We want to store data and read it
