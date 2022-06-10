@@ -34,14 +34,14 @@ typedef struct block{
 /**
  * @brief Reference to a file
  * contains the OS info on a file
- * exist = Y if pointer to directory
- * exist = N if pointer to file
+ * exist = 1 if pointer to directory
+ * exist = 0 if pointer to file
  */
 typedef struct inode{
     int size;
     int first_block;
     char id[ID];
-    char exist; // maybe change to int (1|0)
+    int exist; 
 }i_node;
 
 typedef struct mydirent{
@@ -120,7 +120,7 @@ int get_block_number(int, int);
  * find / claim a block
  * return the fd
  */
-int allocate_file(const char *);
+int allocate_file(int, const char *);
 
 /**
  * @brief print out info about the filesystem from memory
@@ -188,3 +188,16 @@ struct mydirent *myreaddir(int);
  * @brief creating new directory at first Inode
  */
 void create_dir();
+
+/**
+ * @brief welcoming function
+ * just for fun :)
+ */
+void welcome()
+{
+    printf("\033[1;31m    $$      $$$$$  $$$$$$$$$ $     $         \033[1;34m $$$$$         $$     $$$$$       $$      $  $    \n");
+    printf("\033[1;31m   $  $     $   $      $      $   $          \033[1;34m $   $        $  $    $   $      $  $     $ $    \n");
+    printf("\033[1;31m  $ -- $    $$$$$      $        $    \033[1;33m @@@@@@ \033[1;34m $$$$$$$     $ -- $   $$$$$     $ -- $    $$        \n");
+    printf("\033[1;31m $      $   $    $     $        $            \033[1;34m $     $    $      $  $    $   $      $   $ $         \n");
+    printf("\033[1;31m$        $  $     $    $        $            \033[1;34m $$$$$$$   $        $ $     $ $        $  $  $       \n");
+}

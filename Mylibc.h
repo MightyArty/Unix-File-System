@@ -10,7 +10,7 @@
 struct myFile{
     int fd;
     int size;
-    int p;
+    int ptr;
     char *data;
     char func[3];
 };

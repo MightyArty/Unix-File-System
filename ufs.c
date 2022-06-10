@@ -21,7 +21,7 @@ void mymkfs(int s){
     for(int i = 0 ; i < super.inodes_amount ; i++){
         inode_arr[i].size = -1; // if not allocated
         inode_arr[i].first_block = -1;
-        inode_arr[i].exist = 'N';
+        inode_arr[i].exist = 0;
         strcpy(inode_arr[i].id, "empty"); // initialize id to nothing
     }
 
@@ -31,14 +31,28 @@ void mymkfs(int s){
         strcpy(block_arr[i].data, "empty"); // initialize data to nothing
     }
 
-    for(int i = 0 ; i < MAX_FILES ; i++){
-        opened[i].fd = -1;
-        opened[i].index = -1;
-        opened[i].inode = -1;
+    int my_fd = allocate_file(sizeof(directory), "root");
+    inode_arr[my_fd].exist = 1;
+    directory *dir = (directory *)malloc(sizeof(directory));
+    for(size_t i = 0 ; i < NAME ; i++){
+        dir->fd_num[i] = -1;
     }
+    strcpy(dir->name, "root");
+    dir->amount = 0;
+    char *root_dir = (char *)dir;
+    write_byte(my_fd, 0, *root_dir);
+    opened[my_fd].index = opened[my_fd].index + sizeof(root_dir);
+    free(dir);
+    // for(int i = 0 ; i < MAX_FILES ; i++){
+    //     opened[i].fd = -1;
+    //     opened[i].index = -1;
+    //     opened[i].inode = -1;
+    // }
     SIZE = 0;
+    welcome();
+    printf("\n");
     GREEN;
-    printf("succsess in creating new directory\n");
+    printf("Succsess in creating new directory\n");
     RESET;
 }
 
@@ -46,7 +60,7 @@ void sync_fs(const char *ch){
     FILE *file;
     file = fopen(ch, "w+");
     if(file == NULL){
-        printf("error in opening file for writing\n");
+        printf("error in opening file for syncing\n");
         exit(EXIT_FAILURE);
     }
 
@@ -54,14 +68,10 @@ void sync_fs(const char *ch){
     fwrite(&super, sizeof(s_block), 1, file);
 
     // inodes
-    for(int i = 0 ; i < super.inodes_amount ; i++){
-        fwrite(&(inode_arr[i]), sizeof(i_node), 1, file);
-    }
+    fwrite(inode_arr, sizeof(struct inode), super.inodes_amount, file);
 
     //blocks
-    for(int i = 0 ; i < super.blocks_amount ; i++){
-        fwrite(&(block_arr[i]), sizeof(block), 1, file);
-    }
+    fwrite(block_arr, sizeof(struct block), super.blocks_amount, file);
 
     fclose(file);
 }
@@ -87,6 +97,10 @@ void mount_fs(const char *ch){
 }
 
 int mymount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data){
+    if(source == NULL && target == NULL){
+        printf("the source and the target are not provided\n");
+        return -1;
+    }
     // write to target
     if(target != NULL)
         sync_fs(target);
@@ -141,21 +155,26 @@ int find_empty_fd(){
     return -1;
 }
 
-int allocate_file(const char *target){
+int allocate_file(int size, const char *target){
     if(strlen(target) >= ID){
         printf("given target file name is longer then 8\n");
         exit(EXIT_FAILURE);
     }
     int Inode = find_empty_inode();
+    if(Inode == -1){
+        printf("error in finding empty Inode\n");
+        return -1;
+    }
     int Block = find_empty_block();
-    if((Inode == -1) || (Block == -1)){
-        printf("there is no empty inodes or empty blocks\n");
-        exit(EXIT_FAILURE);
+    if(Block == -1){
+        printf("error in finding empty block\n");
+        return -1;
     }
 
+    inode_arr[Inode].size = size;
     inode_arr[Inode].first_block = Block;
-    strcpy(inode_arr[Inode].id, target);
     block_arr[Block].next_block = -2;
+    strcpy(inode_arr[Inode].id, target);
     return Inode;
 }
 
@@ -205,7 +224,7 @@ void shorten_file(int num){
 
 ssize_t mywrite(int myfd, const void *buf, size_t count){
     char *res = (char *)buf;
-    if(inode_arr[myfd].exist == 'Y' || opened[myfd].fd != myfd){
+    if(inode_arr[myfd].exist == 1 || opened[myfd].fd != myfd){
         printf("error occures\n");
         exit(EXIT_FAILURE);
     }
@@ -231,7 +250,7 @@ char read_byte(int fd, int target){
 }
 
 struct mydirent *myreaddir(int target){
-    if(inode_arr[target].exist != 'Y'){
+    if(inode_arr[target].exist != 1){
         printf("error occures\n");
         return NULL;
     }
@@ -275,7 +294,7 @@ int myopen(const char *pathname, int flags){
             printf("couldn't find empty fd\n");
             return -1;
         }
-        int inode = allocate_file(pathname);
+        int inode = allocate_file(1, pathname);
         opened[empty_fd].index = 0;
         opened[empty_fd].inode = inode;
         SIZE++;
@@ -327,19 +346,68 @@ int myclose(int fd){
     return 0;
 }
 
-// -------------NEED TO DO-------------
-// int myopendir(const char *target){
+// need to fix
+int myopendir(const char *target){
+    char path[PATH];
+    char *token;
+    strcpy(path, target);
+    const char temp[2] = "/";
+    token = strtok(path, temp);
+    char first[NAME] = "";
+    char second[NAME] = "";
 
-// }
+    while(token != NULL){
+        strcpy(second, first);
+        strcpy(first, token);
+        token = strtok(NULL, temp);
+    }
+
+    for(size_t i = 0 ; i < super.inodes_amount ; i++){
+        if(!strcmp(inode_arr[i].id, first)){
+            if(inode_arr[i].exist != 1){
+                printf("this is directory and not a file\n");
+                return -1;
+            }
+            return i;
+        }
+    }
+    int fd = myopendir(second);
+    if(fd == -1){
+        printf("error in opening directory with last path\n");
+        return -1;
+    }
+    if(inode_arr[fd].exist != 1){
+        printf("this is directory not a file\n");
+        return -1;
+    }
+    int b = inode_arr[fd].first_block;
+    directory *this_dir = (directory *)block_arr[b].data;
+    int new_fd = allocate_file(sizeof(directory), first);
+    this_dir->fd_num[this_dir->amount++] = new_fd;  // **
+    inode_arr[new_fd].exist = 1;
+    directory *next_dir = (directory *)malloc(sizeof(directory));
+    next_dir->amount = 0;
+    int j;
+    
+    while(j < NAME){
+        next_dir->fd_num[j] = -1;
+        j++;
+    }
+    char *new_dir = (char *)next_dir;
+    write_byte(new_fd, 0, *new_dir);
+    opened[fd].index = opened[fd].index + sizeof(directory);
+    strcpy(next_dir->name, target);
+    return new_fd;
+}
 
 int main(){
-    char *data = "i think barak is gay..";
     mymkfs(1000);
-    mymount("test.txt", "", "", 0, "");
-
-    myopen("test1", O_CREAT);
-    myopen("test2", O_CREAT);
-
-    print_fs();
+    int first = myopendir("root/artem");
+    int second = myopendir("root/barak");
+    if(first == second)
+        printf("test failed\n");
+    else
+        printf("test passed\n");
+    
 
 }

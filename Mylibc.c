@@ -1,5 +1,23 @@
 #include "Mylibc.h"
 #include "color.h"
+#include "ufs.h"
+
+struct myFile *myfopen(const char *pathname, const char *mode){
+    int my_fd = myopen(pathname, -1);
+    if(my_fd == -1){
+        perror("can't find needed file\n");
+        return NULL;
+    }
+
+    struct myFile *my_file = (struct myFile *)malloc(sizeof(struct myFile));
+    strcpy(my_file->func, mode);
+    my_file->fd = my_fd;
+    my_file->ptr = 0;
+    if(!strcmp(mode, "a"))
+        mylseek(my_file->fd, 0, SEEK_END);
+    my_file->data = "new\0";
+    return my_file;
+}
 
 int myfclose(struct myFile *stream){
     if(!strcmp(stream->func, "r")){
@@ -22,6 +40,10 @@ int myfseek(struct myFile *stream, long offset, int whence){
         printf("you are trying to move the ptr by 0 bytes\n");
         exit(EXIT_FAILURE);
     }
-    stream->p = stream->p + offset;
-    return stream->p;
+    stream->ptr = stream->ptr + offset;
+    return stream->ptr;
+}
+
+int main(){
+    mymount("data", NULL, NULL, 0, NULL);
 }
