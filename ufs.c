@@ -401,13 +401,49 @@ int myopendir(const char *target){
 }
 
 int main(){
-    mymkfs(1000);
+    mymkfs(MAX_FILES);
     int first = myopendir("root/artem");
     int second = myopendir("root/barak");
-    if(first == second)
+    YELLOW;
+    printf("___________ -CASE 1- ___________\n");
+    if(first == second){
+        RED;
         printf("test failed\n");
-    else
+        RESET;
+    }
+    else{
+        GREEN;
         printf("test passed\n");
-    
+        RESET;
+    }
+
+    int first_fd = myopen("root/artem/fisrt", 0);
+    int second_fd = myopen("root/artem/second", 0);
+    if(first_fd == second_fd){
+        GREEN;
+        printf("test passed\n");
+        RESET;
+    }
+    else{
+        RED;
+        printf("test failed\n");
+        RESET;
+    }
+
+    first_fd = myclose(first_fd);
+    if(first_fd == second_fd){
+        RED;
+        printf("test failed\n");
+        RESET;
+    }
+    else{
+        GREEN;
+        printf("test passed\n");
+        RESET;
+    }
+
+    // print_fs();
+
+    return 0;
 
 }
