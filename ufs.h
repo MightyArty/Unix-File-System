@@ -105,7 +105,7 @@ void write_byte(int, int, char*);
  * @brief read signel byte from needed file
  * @return char : the readed char || -1 on failure
  */
-char read_byte(int, int);
+char read_byte(int, int, size_t, char*);
 
 /**
  * @brief Get the block number
@@ -172,7 +172,7 @@ size_t myread(int, void *, size_t);
 /**
  * @brief writes data to given fd
  */
-size_t mywrite(int, const void *, size_t);
+size_t mywrite(int, void *, size_t);
 
 /**
  * @brief increment file ptr by given offset
