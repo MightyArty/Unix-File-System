@@ -6,7 +6,7 @@
 #define BLOCK 512
 #define ID 8
 #define MAX_FILES 10000
-#define NAME 10
+#define NAME 12
 #define PATH 50
 
 // credits to : https://www.youtube.com/watch?v=n2AAhiujAqs
@@ -41,7 +41,7 @@ typedef struct inode{
     int size;
     int first_block;
     char id[ID];
-    int exist; 
+    int exist;
 }i_node;
 
 typedef struct mydirent{
@@ -99,7 +99,7 @@ void shorten_file(int);
 /**
  * @brief write single byte to needed file
  */
-void write_byte(int, int, char);
+void write_byte(int, int, char*);
 
 /**
  * @brief read signel byte from needed file
@@ -158,14 +158,21 @@ int myopen(const char *, int);
 int myclose(int);
 
 /**
- * @brief reads data from given fd
+ * @brief closing directory
+ * @return int 
  */
-ssize_t myread(int, void *, size_t);
+int myclosedir(int);
+
+/**
+ * @brief reads data from given file into buf
+ * return index of pointer at the file
+ */
+size_t myread(int, void *, size_t);
 
 /**
  * @brief writes data to given fd
  */
-ssize_t mywrite(int, const void *, size_t);
+size_t mywrite(int, const void *, size_t);
 
 /**
  * @brief increment file ptr by given offset
