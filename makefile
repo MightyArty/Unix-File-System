@@ -9,19 +9,19 @@ ufs_test: ufs_test.o ufs.o
 	$(CC) -o ufs_test ufs_test.o ufs.o
 
 ufs_test.o: ufs_test.c ufs.h color.h
-	$(CC) $(FLAGS) -c ufs_test.c
+	$(CC) -c ufs_test.c
 
 ufs.o: ufs.c ufs.h color.h
-	$(CC) $(FLAGS) -c ufs.c
+	$(CC) -c ufs.c
 
 mylibc_test: mylibc_test.o mylibc.o ufs.o
-	$(CC) $(FLAGS) -o mylibc_test mylibc_test.o mylibc.o ufs.o
+	$(CC) -o mylibc_test mylibc_test.o mylibc.o ufs.o
 
 mylibc_test.o: mylibc_test.c mylibc.h color.h
-	$(CC) $(FLAGS) -c mylibc_test.c
+	$(CC) -c mylibc_test.c
 
 mylibc.o: mylibc.c mylibc.h color.h
-	$(CC) $(FLAGS) -c mylibc.c
+	$(CC) -c mylibc.c
 
 
 # main: main.o libufs.so libmylibc.so
