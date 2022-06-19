@@ -1,45 +1,49 @@
-#include <stdlib.h>
-#include "ufs.h"
-
-/**
- * r: read
- * r+: read and write
- * w: write (if some data already exist delete it and write new data)
- * a: append the new data to already existing data at file
- */
-struct myFile{
-    int fd;
-    int size;
-    int ptr;
-    char *data;
-    char func[3];
-};
-
-struct myFile *myfopen(const char *, const char *);
-
-/**
- * @brief first copy the data from the given stream to the file
- * and free the struct 
- */
-int myfclose(struct myFile *);
-
-/**
- * @brief this func reads certain amount of data
- *  and return new pointer to myFile
- */
-size_t myfread(void *, size_t, size_t, struct myFile *);
+#ifndef __MYLIBC__H__
+#define __MYLIBC__H__
 
 
-size_t myfwrite(const void *, size_t, size_t, struct myFile *);
 
-/**
- * @brief moving the pointer by given offset
- * @return int : the new pointer location
- */
-int myfseek(struct myFile *, long, int);
+#define BUFFER_SIZE 512
+// credits to : https://github.com/chris710/IOLib/tree/master/IOLib
+#include<stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>	
+#include <stdarg.h>
+#include <string.h>
+
+typedef struct myFILE {
+	int file;	//file descriptor given by open
+	int pointer;	//last element read in rbuffer
+	int wpointer;	//last element written in wbuffer
+	int eof;	//eof occured during last read;
+	void* previous;	//where data comes from (for flushing)
+	char* buffer;	//buffer for reading 
+}myFILE;
+
+//opens a file 'name' in a mode 'mode'
+myFILE *my_fopen(char *name, char *mode);
+
+//frees memory of a file 'f'
+int my_fclose(myFILE *f);
+
+//reads at most 'nbelem' bytes to array/file 'p' of size 'size' from file 'f'
+int my_fread(void *p, size_t size, size_t nbelem, myFILE *f);
+
+//writes at most 'nbelem' bytes from array/file 'p' of size 'size' to file 'f'
+int my_fwrite(void *p, size_t taille, size_t nbelem, myFILE *f);
+
+//returns 1 if eof occured during previous read
+int my_feof(myFILE *f);
 
 
-int myfscanf(struct myFile *, const char *, ...);
 
+/**  FORMATED I/O  SECTION  **/
 
-int myprintf(struct myFile *, const char *, ...);
+//writes text to 'f'
+int my_fprintf(myFILE *f, char *format, ...);
+
+//writes to addresses after format from file 'f'
+int my_fscanf(myFILE *f, char *format, ...);
+
+#endif  //!__MYLIBC__H__

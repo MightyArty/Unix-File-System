@@ -1,60 +1,53 @@
 #include "ufs.h"
-#include "color.h"
-
-/**
- * Global variables
- */
-s_block super;
-block *block_arr;
-struct inode *inode_arr;
-struct myopenfile opened[MAX_FILES];
-int SIZE; // holds the size of file descriptor
 
 void mymkfs(int s)
 {
     int update_size = s - (sizeof(s_block));
-    int free_space = (update_size / 10);
+    int free_space = (update_size / 100) * 10;
+
     super.inodes_amount = (free_space) / (sizeof(i_node));
     super.blocks_amount = (update_size - free_space) / (sizeof(block));
     super.blokcs_size = sizeof(block);
 
     inode_arr = (i_node *)malloc(sizeof(i_node) * super.inodes_amount);
+    if (inode_arr == NULL)
+    {
+        puts("err malloc inode arr");
+        exit(1);
+    }
     for (int i = 0; i < super.inodes_amount; i++)
     {
-        inode_arr[i].size = -1;
-        inode_arr[i].first_block = -1;
-        inode_arr[i].exist = 0;
-        strcpy(inode_arr[i].id, "empty inode"); // initialize id to nothing
+        inode_arr[i].first_block = FREE;
+        inode_arr[i].size_file = 0;
+        inode_arr[i].isDir = -1;
+        inode_arr[i].block_count = 0;
+        inode_arr[i].free = 1;
+        strcpy(inode_arr[i].name, "empty"); // initialize id to nothing
     }
 
     block_arr = (block *)malloc(sizeof(block) * super.blocks_amount);
+    if (block_arr == NULL)
+    {
+        puts("err malloc block arr");
+        exit(1);
+    }
     for (int i = 0; i < super.blocks_amount; i++)
     {
         block_arr[i].next_block = -1;
-        bzero(block_arr[i].data, 0); // initialize data to nothing
+        block_arr[i].free = 1;
+        bzero(block_arr[i].data, '\0'); // initialize data to nothing
     }
 
-    int my_fd = allocate_file(sizeof(directory), "root");
-    if (my_fd != 0)
+    for (int i = 0; i < MAX_FILES; i++)
     {
-        printf("file already exist, can't create\n");
-        exit(EXIT_FAILURE);
+        opened[i].access = -1;
+        opened[i].inode = -1;
+        opened[i].lseek_index = -1;
     }
-    inode_arr[my_fd].exist = 1;
-    directory *dir = (directory *)malloc(sizeof(directory));
-    for (size_t i = 0; i < NAME; i++)
-    {
-        dir->fd_num[i] = -1;
-    }
-    strcpy(dir->name, "root");
-    dir->amount = 0;
-    char *root_dir = (char *)dir;
-    // for(size_t i = 0 ; i < sizeof(directory) ; i++){
-    //     write_byte(my_fd, i, &root_dir[i]);
-    // }
-    write_byte(my_fd, 0, root_dir);
-    opened[my_fd].index = opened[my_fd].index + sizeof(root_dir);
-    free(dir);
+
+    allocate_inode("./", IS_DIR);
+
+    sync_fs("unix_file_system");
     welcome();
     printf("\n");
     GREEN;
@@ -75,11 +68,9 @@ void sync_fs(const char *ch)
     // superblock
     fwrite(&super, sizeof(s_block), 1, file);
 
-    // inodes
-    fwrite(inode_arr, sizeof(struct inode), super.inodes_amount, file);
+    fwrite(inode_arr, sizeof(*inode_arr), super.inodes_amount, file);
 
-    // blocks
-    fwrite(block_arr, sizeof(struct block), super.blocks_amount, file);
+    fwrite(block_arr, sizeof(*block_arr), super.blocks_amount, file);
 
     fclose(file);
 }
@@ -93,15 +84,20 @@ void mount_fs(const char *ch)
         printf("error in opening file\n");
         exit(EXIT_FAILURE);
     }
-
     // superblock
-    fread(&super, sizeof(struct superblock), 1, file);
+    fread(&super, sizeof(s_block), 1, file);
 
-    inode_arr = (struct inode *)malloc(sizeof(struct inode) * super.inodes_amount);
-    block_arr = (struct block *)malloc(sizeof(struct block) * super.blocks_amount);
+    // inodes
+    if (inode_arr != NULL)
+        free(inode_arr);
+    inode_arr = (i_node *)malloc(sizeof(i_node) * super.inodes_amount);
+    fread(inode_arr, sizeof(*inode_arr), super.inodes_amount, file);
 
-    fread(inode_arr, sizeof(struct inode), super.inodes_amount, file);
-    fread(block_arr, sizeof(struct block), super.blocks_amount, file);
+    // blocks
+    if (block_arr != NULL)
+        free(block_arr);
+    block_arr = (block *)malloc(sizeof(block) * super.blocks_amount);
+    fread(block_arr, sizeof(*block_arr), super.blocks_amount, file);
 
     fclose(file);
 }
@@ -115,10 +111,10 @@ int mymount(const char *source, const char *target, const char *filesystemtype, 
     }
     // write to target
     if (target != NULL)
-        sync_fs(target);
+        mount_fs(target);
     // read the source
     else if (source != NULL)
-        mount_fs(source);
+        sync_fs(source);
 
     return 0;
 }
@@ -135,7 +131,7 @@ void print_fs()
     printf("Inodes\n");
     for (int i = 0; i < super.inodes_amount; i++)
     {
-        printf("\tsize: %d block: %d name: %s\n", inode_arr[i].size, inode_arr[i].first_block, inode_arr[i].id);
+        printf("\tsize: %d block: %d name: %s\n", inode_arr[i].size_file, inode_arr[i].first_block, inode_arr[i].name);
     }
     YELLOW;
     printf("Blokcs\n");
@@ -150,7 +146,7 @@ int find_empty_inode()
 {
     for (int i = 0; i < super.inodes_amount; i++)
     {
-        if (inode_arr[i].first_block == -1)
+        if (inode_arr[i].free == 1)
             return i;
     }
     return -1; // on failure
@@ -160,7 +156,7 @@ int find_empty_block()
 {
     for (int i = 0; i < super.blocks_amount; i++)
     {
-        if (block_arr[i].next_block == -1)
+        if (block_arr[i].free == 1)
             return i;
     }
     return -1; // on failure
@@ -176,37 +172,35 @@ int find_empty_fd()
     return -1;
 }
 
-int allocate_file(int size, const char *target)
+int allocate_inode(const char *target, int isDir)
 {
-    if (strlen(target) >= ID)
+    if (strlen(target) >= MAX_NAME)
     {
         printf("given target file name is longer then 8\n");
         exit(EXIT_FAILURE);
     }
     int Inode = find_empty_inode();
-    if (Inode == -1)
+    int block = find_empty_block();
+    if (Inode == -1 || block == -1)
     {
         printf("error in finding empty Inode\n");
         return -1;
     }
-    int Block = find_empty_block();
-    if (Block == -1)
-    {
-        printf("error in finding empty block\n");
-        return -1;
-    }
-
-    inode_arr[Inode].size = size;
-    inode_arr[Inode].first_block = Block;
-    block_arr[Block].next_block = -2;
-    strcpy(inode_arr[Inode].id, target);
+    inode_arr[Inode].first_block = block;
+    inode_arr[Inode].block_count = 1;
+    inode_arr[Inode].isDir = isDir;
+    strcpy(inode_arr[Inode].name, target);
+    inode_arr[Inode].free = 0;
     return Inode;
 }
 
-void set_file_size(int num, int size)
+void set_file_size(int fd_block, int size)
 {
     int block_amount = size / BLOCK;
-    int block_index = inode_arr[num].first_block;
+    int block_index = inode_arr[fd_block].first_block;
+    // if (block_index == -1)
+    //     block_index = find_empty_block();
+
     if (size % BLOCK != 0)
         block_amount = block_amount + 1;
 
@@ -226,19 +220,149 @@ void set_file_size(int num, int size)
     block_arr[block_index].next_block = -2;
 }
 
-void write_byte(int num, int target, char *data)
+int myclose(int fd)
 {
-    printf("target %d\n", target);
-    int curr = target / BLOCK;
-    printf("curr %d\n", curr);
-    int block_index = get_block_number(num, curr);
-    printf("block index %d\n", block_index);
-    int res = target % BLOCK;
-    printf("res %d\n", res);
-    for (int i = 0; i < strlen(data); i++)
+    if (fd >= MAX_FILES)
     {
-        block_arr[block_index].data[res + i] = data[i];
+        printf("my mount didn't happen yet\n");
+        return -1;
     }
+    opened[fd].lseek_index = -1;
+    opened[fd].inode = -1;
+    opened[fd].access = -1;
+    return 0;
+}
+
+int mylseek(int myfd, off_t offset, int whence)
+{
+    if ((opened[myfd].access & O_APPEND) == O_APPEND)
+    {
+        printf("wrong usage of mysleek func, enter positive or negative offset\n");
+        exit(EXIT_FAILURE);
+    }
+
+    switch (whence)
+    {
+    case (SEEK_SET):
+        opened[myfd].lseek_index = offset;
+        break;
+    case (SEEK_END):
+        opened[myfd].lseek_index = inode_arr[myfd].size_file + offset;
+        break;
+    case (SEEK_CUR):
+        opened[myfd].lseek_index += (int)offset;
+        break;
+    }
+
+    if (opened[myfd].lseek_index < 0)
+        opened[myfd].lseek_index = 0;
+
+    return opened[myfd].lseek_index;
+}
+
+int myclosedir(myDIR *dirp)
+{
+    free((*dirp).dirent);
+    free(dirp);
+    printf("Closing directory\n");
+    return 0;
+}
+
+int findPath(const char *path)
+{
+    for (int i = 0; i < super.inodes_amount; ++i)
+    {
+        if (!strcmp(inode_arr[i].name, path))
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int myopen(const char *pathname, int flags)
+{
+
+    if (strlen(pathname) <= 0)
+    {
+        perror("please give a valid path name\n");
+        exit(EXIT_FAILURE);
+    }
+    int inode = findPath(pathname);
+
+    if (inode == -1 && flags & O_CREAT)
+        inode = allocate_inode(pathname, IS_FILE);
+
+    int newfd = find_empty_fd();
+    if (newfd == -1)
+    {
+        return -1;
+    }
+    if ((flags & O_APPEND) == O_APPEND)
+    {
+        opened[newfd].lseek_index = inode_arr[inode].size_file;
+    }
+    else
+    {
+        opened[newfd].lseek_index = 0;
+    }
+
+    opened[newfd].inode = inode;
+    opened[newfd].access = flags;
+    return newfd;
+}
+
+struct mydirent *myreaddir(struct myDIR *dirp)
+{
+    if (dirp->amount != dirp->index)
+    {
+
+        mydirent *dirent = &(dirp->dirent[dirp->index]);
+        dirp->index += 1;
+        if (dirent->fd_inode == -3)
+            return NULL;
+        return dirent;
+    }
+    return NULL;
+}
+
+myDIR *myopendir(const char *target)
+{
+    int count = 0;
+    myDIR *ans = (myDIR *)malloc(sizeof(myDIR));
+    ans->dirent = (mydirent *)malloc(sizeof(struct mydirent) * MAX_FILES / 2);
+    int s = 0;
+    for (int i = 0; i < super.inodes_amount; i++)
+    {
+        char *name = inode_arr[i].name;
+        int j = (int)strlen(name) - 1;
+        while (j > 0)
+        {
+            s++;
+            if (name[j] == '/')
+            {
+                break;
+            }
+            j--;
+        }
+        if (strcmp(inode_arr[i].name, "empty") == 0)
+            continue;
+        char name_[256];
+        strncpy(name_, name, (int)(strlen(name) - s));
+        s = 0;
+        if (strcmp(target, name_) == 0)
+        {
+            strcpy(ans->dirent[count].d_name, name + strlen(target) + 1);
+            ans->dirent[count].fd_inode = i;
+            ans->dirent[count].d_type = inode_arr[i].isDir;
+            count++;
+        }
+    }
+    ans->amount = count;
+    ans->index = 0;
+    count++;
+    ans->dirent[count].fd_inode = -3;
+    return ans;
 }
 
 int get_block_number(int num, int res)
@@ -261,387 +385,125 @@ void shorten_file(int num)
     block_arr[num].next_block = -1;
 }
 
-size_t mywrite(int myfd, void *buf, size_t count)
+size_t mywrite(int myfd, const void *buf, size_t count)
 {
-    // if(inode_arr[myfd].exist == 1 || opened[myfd].fd != myfd){
-    //     perror("error occures\n");
-    //     return -1;
-    // }
-    char *curr = (char *)buf;
-    printf("before\n");
-    write_byte(myfd, opened[myfd].index, curr);
-    opened[myfd].index = opened[myfd].index + count;
-    printf("after\n");
-    return opened[myfd].index;
+    if ((opened[myfd].access != (O_WRONLY | O_CREAT) && opened[myfd].access != (O_RDWR | O_CREAT) && opened[myfd].access != (O_APPEND | O_CREAT) && opened[myfd].access != O_WRONLY && opened[myfd].access != O_RDWR && opened->access != O_APPEND) || opened[myfd].inode == -1)
+        return -1;
+
+    int writeSum = 0;
+    int block = inode_arr[opened[myfd].inode].first_block;
+    int offset = opened[myfd].lseek_index;
+
+    while (offset > BLOCK_SIZE)
+    {
+        block = block_arr[block].next_block;
+        offset -= BLOCK_SIZE;
+    }
+
+    while (block_arr[block].next_block != -1 && count >= BLOCK_SIZE)
+    {
+
+        strncpy(block_arr[block].data + offset, (char *)buf, BLOCK_SIZE - offset);
+        offset = 0;
+        block = block_arr[block].next_block;
+        count -= BLOCK_SIZE;
+        writeSum += BLOCK_SIZE;
+    }
+
+    while (block_arr[block].next_block == -1 && count >= BLOCK_SIZE)
+    {
+        strncpy(block_arr[block].data + offset, (char *)buf, BLOCK_SIZE - offset);
+        offset = 0;
+        count -= BLOCK_SIZE;
+        writeSum += BLOCK_SIZE;
+        // finding a new block to write on
+        block_arr[block].next_block = find_empty_block();
+        if (block_arr[block].next_block == -1)
+        {
+            return -1;
+        }
+        block_arr[block_arr[block].next_block].free = 0;
+        block = block_arr[block].next_block;
+    }
+
+    while (block_arr[block].next_block == -1 && count < BLOCK_SIZE && count > 0)
+    {
+        if (count + offset < BLOCK_SIZE)
+        {
+            strncpy(block_arr[block].data + offset, (char *)buf, count);
+            writeSum += (int)count;
+            count = 0;
+        }
+        else
+        {
+            strncpy(block_arr[block].data + offset, (char *)buf, BLOCK_SIZE - offset);
+            offset = 0;
+            count -= BLOCK_SIZE + offset;
+            writeSum += BLOCK_SIZE - offset;
+            // finding a new block to write on
+            block_arr[block].next_block = find_empty_block();
+            if (block_arr[block].next_block == -1)
+            {
+                return -1;
+            }
+            block_arr[block_arr[block].next_block].free = 0;
+            block = block_arr[block].next_block;
+        }
+    }
+    opened[myfd].lseek_index += (int)writeSum;
+    inode_arr[opened[myfd].inode].size_file += (int)writeSum;
+    return opened[myfd].inode;
 }
 
 size_t myread(int myfd, void *buf, size_t count)
 {
-    if (inode_arr[myfd].exist == 1)
+
+    if (myfd < 0 || myfd > MAX_FILES || opened[myfd].inode == FREE)
     {
-        perror("error ocures\n");
+        puts("err");
         return -1;
     }
-    // char *s = (char *)malloc(count + 1); // set string to count size
-    // for(size_t i = 0 ; i < count ; i++){
-    //     s[i] = read_byte(myfd, opened[myfd].index);
-    // }
-    // printf("index of of%d\n", opened[myfd].index);
-    // printf("count %d\n", count);
-    read_byte(myfd, opened[myfd].index, count, (char *)buf);
-    // s[count] = '\0';
-    // strncpy((char *)buf, s, count);
-    // free(s);
-    return opened[myfd].index;
+    if (opened[myfd].access != (O_RDWR | O_CREAT) && opened[myfd].access != O_RDWR && opened[myfd].access != (O_RDONLY | O_CREAT) && opened[myfd].access != O_RDONLY)
+    {
+        puts("err");
+        return -1;
+    }
+    read_byte(myfd, opened[myfd].lseek_index, count, (char *)buf);
+    return opened[myfd].lseek_index;
 }
 
-char read_byte(int fd, int target, size_t count, char *buf)
+void read_byte(int myfd, int offset, size_t count, char *buf)
 {
-    bzero(buf, 0);
-    int next = inode_arr[fd].first_block;
+    bzero(buf, '\0');
+    int next = inode_arr[myfd].first_block;
     int block_num = count / BLOCK;
-    printf("block arr data%s\n", block_arr[next].data);
+
     int j = 0;
+    while (offset > BLOCK_SIZE)
+    {
+        next = block_arr[next].next_block;
+        offset -= BLOCK_SIZE;
+    }
+    offset = 0;
+    opened[myfd].lseek_index = BLOCK_SIZE * block_num;
     do
     {
-        while (target <= BLOCK && j != count)
+        while (offset <= BLOCK && j != count)
         {
-            // target ++;
-            buf[j] = block_arr[next].data[target];
-            j++, target++;
-            // next = block_arr[next].next_block;
-            // if(next == -1 || next == -2){
-            //     printf("error in reading\n");
-            //     return -1;
-            // }
+            buf[j] = block_arr[next].data[offset];
+            j++, offset++;
         }
         if (j == count)
             break;
         next = block_arr[next].next_block;
         block_num--;
-        target = 0;
+        offset = 0;
     } while (block_num < 0);
-    printf("buff %s\n", buf);
-    return block_arr[next].data[target];
-    // return buf;
-}
-
-struct mydirent *myreaddir(int target)
-{
-    if (inode_arr[target].exist != 1)
-    {
-        printf("error occures\n");
-        return NULL;
-    }
-    directory *dir = (directory *)block_arr[inode_arr[target].first_block].data;
-    return dir;
-}
-
-int mylseek(int myfd, int offset, int whence)
-{
-    // if((offset == 0) || (opened[myfd].fd != myfd)){
-    //     printf("wrong usage of mysleek func, enter positive or negative offset\n");
-    //     exit(EXIT_FAILURE);
-    // }
-    if (whence < 0 || whence > 2)
-    {
-        printf("whence should be 0 | 1 | 2\n");
-        exit(EXIT_FAILURE);
-    }
-    switch (whence)
-    {
-    case (SEEK_SET):
-        opened[myfd].index = offset;
-        break;
-    case (SEEK_END):
-        opened[myfd].index = inode_arr[myfd].size + offset;
-        break;
-    case (SEEK_CUR):
-        opened[myfd].index = opened[myfd].index + offset;
-        break;
-    }
-
-    if (opened[myfd].index < 0)
-        opened[myfd].index = 0;
-
-    return opened[myfd].index;
-}
-
-int myopen(const char *pathname, int flags)
-{
-    if (strlen(pathname) <= 0)
-    {
-        perror("please give a valid path name\n");
-        exit(EXIT_FAILURE);
-    }
-    char name[NAME];
-    char *token;
-    strcpy(name, pathname);
-    const char buf[2] = "/";
-    token = strtok(name, buf);
-    char first[PATH] = "";
-    char second[PATH] = "";
-    while (token != NULL)
-    {
-        strcpy(second, first);
-        strcpy(first, token);
-        token = strtok(NULL, buf);
-    }
-    printf("%s\n", first);
-    for (size_t i = 0; i < super.inodes_amount; i++)
-    {
-        if (!strcmp(inode_arr[i].id, first))
-        {
-            if (inode_arr[i].exist != 0)
-            {
-                perror("error in finding empty inode\n");
-            }
-            opened[i].index = 0;
-            opened[i].fd = i;
-            return i;
-        }
-    }
-    int fd1 = allocate_file(1, first);
-    int fd2 = myopendir(second);
-    directory *dir = myreaddir(fd2);
-    dir->fd_num[dir->amount++] = fd1;
-    opened[fd1].index = 0;
-    opened[fd1].fd = fd1;
-    printf("fd index %d\n", opened[fd1].index);
-    return fd1;
-}
-
-// int myopen(const char *pathname, int flags){
-//     if(strlen(pathname) <= 0){
-//         printf("please give good path name\n");
-//         exit(EXIT_FAILURE);
-//     }
-
-//     if(flags == O_CREAT){
-//         int empty_fd = find_empty_fd();
-//         if(empty_fd == -1){
-//             printf("couldn't find empty fd\n");
-//             return -1;
-//         }
-//         int inode = allocate_file(1, pathname);
-//         opened[empty_fd].index = 0;
-//         opened[empty_fd].inode = inode;
-//         return empty_fd;
-//     }
-
-//     else if(flags == O_RDWR || flags == O_WRONLY || flags == O_RDONLY){
-//         int inode_index = -1;
-//         for(int i = 0 ; i < super.inodes_amount ; i++){
-//             if(!strcmp(inode_arr[i].id, pathname))
-//                 inode_index = i;
-//         }
-//         if(inode_index == -1){
-//             printf("error in finding the needed file\n");
-//             return -1;
-//         }
-//         else{
-//             int curr = -1;
-//             for(int i = 0 ; i < SIZE ; i++){
-//                 if(opened[i].inode == inode_index)
-//                     curr = i;
-//             }
-//             if(curr == -1){
-//                 printf("error in finding the needed inode\n");
-//                 return -1;
-//             }
-//             else{
-//                 if(flags == O_WRONLY)
-//                     opened[curr].fd = 0;
-//                 if(flags == O_RDONLY)
-//                     opened[curr].fd = 1;
-//                 if(flags == O_RDWR)
-//                     opened[curr].fd = 2;
-//                 return curr;
-//             }
-//         }
-//     }
-//     else{
-//         printf("some error occured in opening file\n");
-//         return -1;
-//     }
-// }
-
-int myclose(int fd)
-{
-    // opened[fd].index = -1;
-    opened[fd].fd = -1;
-    return 0;
-}
-
-int myclosedir(int fd)
-{
-    printf("Closing directory\n");
-    return -1;
-}
-
-int myopendir(const char *target)
-{
-    char path[PATH];
-    char *token;
-    strcpy(path, target);
-    const char temp[2] = "/";
-    token = strtok(path, temp);
-    char first[NAME] = "";
-    char second[NAME] = "";
-
-    while (token != NULL)
-    {
-        strcpy(second, first);
-        strcpy(first, token);
-        token = strtok(NULL, temp);
-    }
-
-    for (size_t i = 0; i < super.inodes_amount; i++)
-    {
-        if (!strcmp(inode_arr[i].id, first))
-        {
-            if (inode_arr[i].exist != 1)
-            {
-                printf("this is directory and not a file\n");
-                return -1;
-            }
-            return i;
-        }
-    }
-    int fd = myopendir(second);
-    if (fd == -1)
-    {
-        printf("error in opening directory with last path\n");
-        return -1;
-    }
-    if (inode_arr[fd].exist != 1)
-    {
-        printf("this is directory not a file\n");
-        return -1;
-    }
-    int b = inode_arr[fd].first_block;
-    directory *this_dir = (directory *)block_arr[b].data;
-    int new_fd = allocate_file(sizeof(directory), first);
-    this_dir->fd_num[this_dir->amount++] = new_fd; // **
-    inode_arr[new_fd].exist = 1;
-    directory *next_dir = (directory *)malloc(sizeof(directory));
-    next_dir->amount = 0;
-    int j;
-    while (j < NAME)
-    {
-        next_dir->fd_num[j] = -1;
-        j++;
-    }
-    char *new_dir = (char *)next_dir;
-    write_byte(new_fd, 0, new_dir);
-    opened[fd].index = opened[fd].index + sizeof(directory);
-    strcpy(next_dir->name, target);
-    return new_fd;
+    opened[myfd].lseek_index = BLOCK_SIZE - (BLOCK_SIZE - offset);
 }
 
 int main()
 {
-    mymkfs(MAX_FILES);
-    int i = 1;
-    int first = myopendir("root/artem");
-    int second = myopendir("root/barak");
-    // print_fs();
-    BLUE;
-    printf("___________ -CASE 1- ___________\n");
-    if (first == second)
-    {
-        RED;
-        printf("Test number %d failed\n", i);
-        RESET;
-    }
-    else
-    {
-        GREEN;
-        printf("Test number %d passed\n", i);
-        RESET;
-    }
-    i++;
-
-    int first_fd = myopen("root/artem/first", 0);
-    int second_fd = myopen("root/artem/first", 0);
-    int third_fd = myopen("root/barak/second", 0);
-    printf("first fd %d\n", opened[first_fd].index);
-    // print_fs();
-    if (first_fd == second_fd)
-    {
-        GREEN;
-        printf("Test number %d passed\n", i);
-        RESET;
-    }
-    else
-    {
-        RED;
-        printf("Test number %d failed\n", i);
-        RESET;
-    }
-    i++;
-
-    BLUE;
-    printf("___________ -CASE 2- ___________\n");
-    first_fd = myclose(first_fd);
-    if (first_fd == second_fd)
-    {
-        RED;
-        printf("Test number %d failed\n", i);
-        RESET;
-    }
-    else
-    {
-        GREEN;
-        printf("Test number %d passed\n", i);
-        RESET;
-    }
-    printf("second fd after %d\n", opened[second_fd].index);
-    BLUE;
-    printf("___________ -CASE 3- ___________\n");
-    // print_fs();
-    char *data = "This is test";
-    int a = mywrite(second_fd, data, 15);
-    char buf[15];
-    i++;
-    printf("second fd after before %d\n", opened[second_fd].index);
-    mylseek(second_fd, -15, SEEK_CUR);
-    printf("second fd after after %d\n", opened[second_fd].index);
-    myread(second_fd, buf, 15);
-    printf("%s\n", buf);
-    if (strcmp(buf, "This is test") == 0)
-    {
-        GREEN;
-        printf("Test number %d passed\n", i);
-        RESET;
-    }
-    else
-    {
-        RED;
-        printf("Test number %d failed\n", i);
-        RESET;
-    }
-
-    i++;
-    char *data1 = "barak";
-    char new_buf[5];
-    
-    int b = mywrite(third_fd, data1, 5);
-    puts(block_arr[inode_arr[third_fd].first_block].data);
-    printf("third before %d\n", opened[third_fd].index);
-    mylseek(third_fd, 2 , SEEK_SET);
-    printf("third after %d\n", opened[third_fd].index);
-    myread(third_fd, new_buf, 20);
-    puts(new_buf);
-    if(strcmp(buf, new_buf) == 0){
-        RED;
-        printf("Test number %d failed\n", i);
-        RESET;
-    }
-    else{
-        GREEN;
-        printf("Test number %d passed\n", i);
-    }
 
     return 0;
 }

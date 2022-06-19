@@ -1,14 +1,45 @@
+#ifndef __UFS__H__
+#define __UFS__H__
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include "color.h"
+#include <sys/mount.h>
+#include <regex.h>
 
 #define BLOCK 512
+#define MAX_NAME 128
+
 #define ID 8
 #define MAX_FILES 10000
+
 #define NAME 12
 #define PATH 50
 
+#define USED -2
+#define FREE -1
+
+#define IS_DIR 1
+#define IS_FILE 0
+
+
+/* The possibilities for the third argument to `fseek'.
+   These values should not be changed.  */
+#define SEEK_SET 0 /* Seek from beginning of file.  */
+#define SEEK_CUR 1 /* Seek from current position.  */
+#define SEEK_END 2 /* Seek from end of file.  */
+
+#define O_RDONLY 00
+#define O_WRONLY 01
+#define O_RDWR 02
+#ifndef O_CREAT
+#define O_CREAT 0100 /* Not fcntl.  */
+#endif
+#ifndef O_APPEND
+#define O_APPEND 02000
+#endif
 // credits to : https://www.youtube.com/watch?v=n2AAhiujAqs
 
 /**
@@ -17,45 +48,69 @@
  * number of disk blocks
  * size of the disk blocks
  */
-typedef struct superblock{
+typedef struct superblock
+{
     int blokcs_size;
     int inodes_amount;
     int blocks_amount;
-}s_block;
+} s_block;
 
 /**
  * @brief Place to store data
  */
-typedef struct block{
+typedef struct block
+{ 
     int next_block;
     char data[BLOCK];
-}block;
+    int free;
+} block;
 
 /**
  * @brief Reference to a file
  * contains the OS info on a file
- * exist = 1 if pointer to directory
- * exist = 0 if pointer to file
+ * isDir = 1 if pointer to directory
+ * isDir = 0 if pointer to file
+ *  isDir = -1 if pointer to null
  */
-typedef struct inode{
-    int size;
+typedef struct inode
+{
     int first_block;
-    char id[ID];
-    int exist;
-}i_node;
+    char name[MAX_NAME];
+    int size_file;
+    int block_count;
+    int isDir;
+    int free;
+} i_node;
 
-typedef struct mydirent{
-    char name[NAME];
-    int fd_num[20];
+typedef struct mydirent
+{
+    int fd_inode;               /* Inode number */
+    unsigned char d_type;    /* Type of file; not supported
+                                by all filesystem types */
+    char d_name[MAX_NAME];   /* Null-terminated filename */
+} mydirent;
+typedef struct myDIR
+{
     int amount;
-}directory;
-
-struct myopenfile{
-    int inode;
     int index;
-    int fd;
+    mydirent * dirent;
+} myDIR;
+
+struct myopenfile
+{
+    int access;
+    int lseek_index;
+    int inode;
 };
 
+/**
+ * Global variables
+ */
+struct superblock super;
+struct block *block_arr = NULL;
+struct inode *inode_arr = NULL;
+struct myopenfile opened[MAX_FILES];
+int SIZE; // holds the size of file descriptor
 /**
  * @brief write the file system
  */
@@ -63,7 +118,7 @@ void sync_fs(const char *);
 
 /**
  * @brief read the file system
- * 
+ *
  */
 void mount_fs(const char *);
 
@@ -89,7 +144,7 @@ int find_empty_fd();
 /**
  * @brief seting the needed file size
  */
-void set_file_size(int,int);
+void set_file_size(int, int);
 
 /**
  * @brief cut the file
@@ -97,19 +152,14 @@ void set_file_size(int,int);
 void shorten_file(int);
 
 /**
- * @brief write single byte to needed file
- */
-void write_byte(int, int, char*);
-
-/**
  * @brief read signel byte from needed file
  * @return char : the readed char || -1 on failure
  */
-char read_byte(int, int, size_t, char*);
+void read_byte(int, int, size_t, char *);
 
 /**
  * @brief Get the block number
- * 
+ *
  * @return int : the needed block index
  */
 int get_block_number(int, int);
@@ -120,7 +170,7 @@ int get_block_number(int, int);
  * find / claim a block
  * return the fd
  */
-int allocate_file(int, const char *);
+int allocate_inode(const char *, int);
 
 /**
  * @brief print out info about the filesystem from memory
@@ -142,7 +192,7 @@ void mymkfs(int);
 int mymount(const char *, const char *, const char *, unsigned long, const void *);
 
 /**
- * @brief 
+ * @brief
  * opening file from given path
  * possible values of flags :
  * - O_RDWR: read and write
@@ -159,9 +209,9 @@ int myclose(int);
 
 /**
  * @brief closing directory
- * @return int 
+ * @return int
  */
-int myclosedir(int);
+int myclosedir(myDIR *);
 
 /**
  * @brief reads data from given file into buf
@@ -172,24 +222,24 @@ size_t myread(int, void *, size_t);
 /**
  * @brief writes data to given fd
  */
-size_t mywrite(int, void *, size_t);
+size_t mywrite(int,const void *, size_t);
 
 /**
  * @brief increment file ptr by given offset
  * need to return new pointer
  */
-int mylseek(int, int, int);
+int mylseek(int, off_t, int);
 
 /**
  * @brief  finds the fd of given dir if exist
  * if not -> will create new one
  */
-int myopendir(const char *);
+myDIR * myopendir(const char *);
 
 /**
  * @brief finding the needed directory
  */
-struct mydirent *myreaddir(int);
+struct mydirent *myreaddir(struct myDIR*);
 
 /**
  * @brief creating new directory at first Inode
@@ -208,3 +258,5 @@ void welcome()
     printf("\033[1;31m $      $   $    $     $        $            \033[1;34m $     $    $      $  $    $   $      $   $ $         \n");
     printf("\033[1;31m$        $  $     $    $        $            \033[1;34m $$$$$$$   $        $ $     $ $        $  $  $       \n");
 }
+
+#endif //!__UFS__H__
