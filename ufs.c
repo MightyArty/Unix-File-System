@@ -1,5 +1,23 @@
 #include "ufs.h"
 
+/**
+ * Global variables
+ */
+struct superblock super;
+struct block *block_arr = NULL;
+struct inode *inode_arr = NULL;
+struct myopenfile opened[MAX_FILES];
+int SIZE; // holds the size of file descriptor
+
+void welcome()
+{
+    printf("\033[1;31m    $$      $$$$$  $$$$$$$$$ $     $         \033[1;34m $$$$$         $$     $$$$$       $$      $  $    \n");
+    printf("\033[1;31m   $  $     $   $      $      $   $          \033[1;34m $   $        $  $    $   $      $  $     $ $    \n");
+    printf("\033[1;31m  $ -- $    $$$$$      $        $    \033[1;33m @@@@@@ \033[1;34m $$$$$$$     $ -- $   $$$$$     $ -- $    $$        \n");
+    printf("\033[1;31m $      $   $    $     $        $            \033[1;34m $     $    $      $  $    $   $      $   $ $         \n");
+    printf("\033[1;31m$        $  $     $    $        $            \033[1;34m $$$$$$$   $        $ $     $ $        $  $  $       \n");
+}
+
 void mymkfs(int s)
 {
     int update_size = s - (sizeof(s_block));
@@ -196,12 +214,12 @@ int allocate_inode(const char *target, int isDir)
 
 void set_file_size(int fd_block, int size)
 {
-    int block_amount = size / BLOCK;
+    int block_amount = size / BLOCK_SIZE;
     int block_index = inode_arr[fd_block].first_block;
     // if (block_index == -1)
     //     block_index = find_empty_block();
 
-    if (size % BLOCK != 0)
+    if (size % BLOCK_SIZE != 0)
         block_amount = block_amount + 1;
 
     while (block_amount > 0)
@@ -476,7 +494,7 @@ void read_byte(int myfd, int offset, size_t count, char *buf)
 {
     bzero(buf, '\0');
     int next = inode_arr[myfd].first_block;
-    int block_num = count / BLOCK;
+    int block_num = count / BLOCK_SIZE;
 
     int j = 0;
     while (offset > BLOCK_SIZE)
@@ -488,7 +506,7 @@ void read_byte(int myfd, int offset, size_t count, char *buf)
     opened[myfd].lseek_index = BLOCK_SIZE * block_num;
     do
     {
-        while (offset <= BLOCK && j != count)
+        while (offset <= BLOCK_SIZE && j != count)
         {
             buf[j] = block_arr[next].data[offset];
             j++, offset++;
@@ -500,10 +518,4 @@ void read_byte(int myfd, int offset, size_t count, char *buf)
         offset = 0;
     } while (block_num < 0);
     opened[myfd].lseek_index = BLOCK_SIZE - (BLOCK_SIZE - offset);
-}
-
-int main()
-{
-
-    return 0;
 }

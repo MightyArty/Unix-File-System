@@ -1,5 +1,8 @@
 # Unix File System
 # By Artem Shabalin and Barak Sharabi
+
+![](https://res.cloudinary.com/practicaldev/image/fetch/s--vRFdzzBj--/c_limit%2Cf_auto%2Cfl_progressive%2Cq_auto%2Cw_880/https://dev-to-uploads.s3.amazonaws.com/i/n48jiizbjrcv9xaksp48.png)
+
 ## Why do we need file system?
 * Disks are huge block devices
 * We want to store data and read it
@@ -28,3 +31,19 @@
 ### Super block:
 >* The file system catalog
 >* General information about the file system such as: number of Inodes, number of blocks, number of used and free Inodes and blocks.
+
+## Running Programm:
+```bash
+# Clone the repository
+$ git clone https://github.com/MightyArty/Unix-File-System.git
+# Go into the repository
+$ cd Unix-File-System
+# Open terminal on Linux
+$ Run "make all"
+# After running, mylibc_test and ufs_test will run.
+```
+
+## Cleaning files:
+```bash
+# In the repository
+$ Run "make clean"

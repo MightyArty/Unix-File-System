@@ -9,7 +9,7 @@
 #include <sys/mount.h>
 #include <regex.h>
 
-#define BLOCK 512
+#define BLOCK_SIZE 512
 #define MAX_NAME 128
 
 #define ID 8
@@ -31,9 +31,9 @@
 #define SEEK_CUR 1 /* Seek from current position.  */
 #define SEEK_END 2 /* Seek from end of file.  */
 
-#define O_RDONLY 00
-#define O_WRONLY 01
-#define O_RDWR 02
+// #define O_RDONLY 00
+// #define O_WRONLY 01
+// #define O_RDWR 02
 #ifndef O_CREAT
 #define O_CREAT 0100 /* Not fcntl.  */
 #endif
@@ -61,7 +61,7 @@ typedef struct superblock
 typedef struct block
 { 
     int next_block;
-    char data[BLOCK];
+    char data[BLOCK_SIZE];
     int free;
 } block;
 
@@ -103,14 +103,14 @@ struct myopenfile
     int inode;
 };
 
-/**
- * Global variables
- */
-struct superblock super;
-struct block *block_arr = NULL;
-struct inode *inode_arr = NULL;
-struct myopenfile opened[MAX_FILES];
-int SIZE; // holds the size of file descriptor
+// /**
+//  * Global variables
+//  */
+// struct superblock super;
+// struct block *block_arr = NULL;
+// struct inode *inode_arr = NULL;
+// struct myopenfile opened[MAX_FILES];
+// int SIZE; // holds the size of file descriptor
 /**
  * @brief write the file system
  */
@@ -250,13 +250,13 @@ void create_dir();
  * @brief welcoming function
  * just for fun :)
  */
-void welcome()
-{
-    printf("\033[1;31m    $$      $$$$$  $$$$$$$$$ $     $         \033[1;34m $$$$$         $$     $$$$$       $$      $  $    \n");
-    printf("\033[1;31m   $  $     $   $      $      $   $          \033[1;34m $   $        $  $    $   $      $  $     $ $    \n");
-    printf("\033[1;31m  $ -- $    $$$$$      $        $    \033[1;33m @@@@@@ \033[1;34m $$$$$$$     $ -- $   $$$$$     $ -- $    $$        \n");
-    printf("\033[1;31m $      $   $    $     $        $            \033[1;34m $     $    $      $  $    $   $      $   $ $         \n");
-    printf("\033[1;31m$        $  $     $    $        $            \033[1;34m $$$$$$$   $        $ $     $ $        $  $  $       \n");
-}
+// void welcome()
+// {
+//     printf("\033[1;31m    $$      $$$$$  $$$$$$$$$ $     $         \033[1;34m $$$$$         $$     $$$$$       $$      $  $    \n");
+//     printf("\033[1;31m   $  $     $   $      $      $   $          \033[1;34m $   $        $  $    $   $      $  $     $ $    \n");
+//     printf("\033[1;31m  $ -- $    $$$$$      $        $    \033[1;33m @@@@@@ \033[1;34m $$$$$$$     $ -- $   $$$$$     $ -- $    $$        \n");
+//     printf("\033[1;31m $      $   $    $     $        $            \033[1;34m $     $    $      $  $    $   $      $   $ $         \n");
+//     printf("\033[1;31m$        $  $     $    $        $            \033[1;34m $$$$$$$   $        $ $     $ $        $  $  $       \n");
+// }
 
 #endif //!__UFS__H__

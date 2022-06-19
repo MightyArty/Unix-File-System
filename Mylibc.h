@@ -5,12 +5,13 @@
 
 #define BUFFER_SIZE 512
 // credits to : https://github.com/chris710/IOLib/tree/master/IOLib
-#include<stdlib.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>	
 #include <stdarg.h>
 #include <string.h>
+#include "ufs.h"
 
 typedef struct myFILE {
 	int file;	//file descriptor given by open
