@@ -1,6 +1,6 @@
 CC=gcc
 PIC = -fPIC -g -w
-FLAGS = -Wall -g
+# FLAGS = -Wall -g
 all: ufs_test mylibc_test
 	./ufs_test
 	./mylibc_test
@@ -52,4 +52,4 @@ mylibc.o: mylibc.c mylibc.h color.h
 # valgrind: ufs
 # 	valgrind  --leak-check=full --show-leak-kinds=all ./main
 clean:
-	rm -f *.o data.txt ufs ufs_test mylibc_test  unix_file_system libmylibc.so libufs.so
+	rm -f *.o data.txt ufs ufs_test mylibc_test  unix_file_system libmylibc.so libufs.so main
